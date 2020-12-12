@@ -1,7 +1,6 @@
 package com.steven.topsail.demo.quickstart.cache;
 
 import com.asiainfo.bits.core.redis.client.RedisClient;
-import com.steven.topsail.demo.quickstart.util.SpringContextUtils;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -21,32 +20,42 @@ import java.util.concurrent.Callable;
 @Slf4j
 public class MultiLevelCache extends AbstractValueAdaptingCache {
 
+    /**
+     * 模块名
+     */
     private String moduleName;
+
+    /**
+     * 缓存名
+     */
     private String name;
 
+    /**
+     * 缓存版本
+     */
     @Getter
     @Setter
     private String version;
+
     private RedisClient pubRedisClient;
-    private com.github.benmanes.caffeine.cache.Cache<Object, Object> localCache;
+
+    /**
+     * 本地缓存，采用共享模式
+     */
+    private com.github.benmanes.caffeine.cache.Cache<String, Object> localCache;
 
     /**
      * Redis缓存的最大过期时间，28天
      */
     private static final long EXPIRATION_TIMEOUT = 86400 * 28;
 
-    public MultiLevelCache(String name,
+    public MultiLevelCache(String moduleName,
+                           String name,
                            String version,
                            RedisClient pubRedisClient,
-                           com.github.benmanes.caffeine.cache.Cache<Object, Object> localCache) {
+                           com.github.benmanes.caffeine.cache.Cache<String, Object> localCache) {
         super(true);
-        this.moduleName = "no_module_name";
-        try {
-            moduleName = SpringContextUtils.getPropertyValue("module-name");
-        } catch (Exception e) {
-            log.error("应用中未配置'module-name'属性，请在application.yml中加入配置");
-        }
-
+        this.moduleName = moduleName;
         this.name = name;
         this.version = version;
         this.pubRedisClient = pubRedisClient;

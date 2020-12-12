@@ -2,6 +2,7 @@ package com.steven.topsail.demo.quickstart.cache;
 
 import com.asiainfo.bits.core.redis.client.RedisClient;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.steven.topsail.demo.quickstart.util.SpringContextUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -26,18 +27,38 @@ public class MultiLevelCacheManager implements CacheManager {
     /**
      * 本地缓存
      */
-    private com.github.benmanes.caffeine.cache.Cache<Object, Object> localCache = Caffeine.newBuilder()
-        .maximumSize(10000)
-        .expireAfterWrite(1, TimeUnit.MINUTES)
+    private com.github.benmanes.caffeine.cache.Cache<String, Object> localCache = Caffeine.newBuilder()
+        .maximumSize(50000)
+        .expireAfterWrite(10, TimeUnit.MINUTES)
         .build();
 
     private ConcurrentMap<String, MultiLevelCache> cacheMap = new ConcurrentHashMap<>(512);
+
+    /**
+     * 版本号
+     */
     private Map<String, String> cacheVersion = new HashMap<>(512);
 
     private RedisClient pubRedisClient;
 
+    /**
+     * 模块名
+     */
+    private String moduleName;
+
     public MultiLevelCacheManager(RedisClient pubRedisClient) {
         this.pubRedisClient = pubRedisClient;
+
+        this.moduleName = "no_module_name";
+        try {
+            moduleName = SpringContextUtils.getPropertyValue("module-name");
+        } catch (Exception e) {
+            log.error("应用中未配置'module-name'属性，请在application.yml中加入配置");
+        }
+
+        /**
+         * 版本同步线程
+         */
         SyncVersionThread syncVersionThread = new SyncVersionThread();
         syncVersionThread.setDaemon(true);
         syncVersionThread.start();
@@ -56,16 +77,19 @@ public class MultiLevelCacheManager implements CacheManager {
     public Cache getCache(String name) {
 
         MultiLevelCache multiLevelCache = cacheMap.get(name);
+
+        if (null != multiLevelCache) {
+            return multiLevelCache;
+        }
+
         String version = cacheVersion.get(name);
         if (null == version) {
-            version = "100000";
+            version = "def";
             cacheVersion.putIfAbsent(name, version);
         }
 
-        if (null == multiLevelCache) {
-            multiLevelCache = new MultiLevelCache(name, version, pubRedisClient, localCache);
-            cacheMap.putIfAbsent(name, multiLevelCache);
-        }
+        multiLevelCache = new MultiLevelCache(moduleName, name, version, pubRedisClient, localCache);
+        cacheMap.putIfAbsent(name, multiLevelCache);
 
         return multiLevelCache;
 
@@ -81,6 +105,9 @@ public class MultiLevelCacheManager implements CacheManager {
         return Collections.unmodifiableSet(cacheMap.keySet());
     }
 
+    /**
+     * 版本同步线程
+     */
     private class SyncVersionThread extends Thread {
 
         private static final String VKEY = "##==>BITS_CACHE_VERSION<==##";
@@ -89,22 +116,21 @@ public class MultiLevelCacheManager implements CacheManager {
         public void run() {
             while (true) {
 
-                Map<String, String> newCacheVersion = pubRedisClient.hgetAll(VKEY);
-                cacheVersion = newCacheVersion;
-
-                for (String name : cacheMap.keySet()) {
-                    MultiLevelCache multiLevelCache = cacheMap.get(name);
-                    String version = cacheVersion.get(name);
-                    multiLevelCache.setVersion(version);
-                }
-
-                //System.out.println("cacheVersion: " + cacheVersion);
-
                 try {
-                    Thread.sleep(1000 * 10);
-                } catch (InterruptedException e) {
+                    Map<String, String> newCacheVersion = pubRedisClient.hgetAll(VKEY);
+                    cacheVersion = newCacheVersion;
+
+                    for (String name : cacheMap.keySet()) {
+                        MultiLevelCache multiLevelCache = cacheMap.get(name);
+                        String version = cacheVersion.get(name);
+                        multiLevelCache.setVersion(version);
+                    }
+
+                    Thread.sleep(60000);
+                } catch (Throwable e) {
                     e.printStackTrace();
                 }
+
             }
         }
 
