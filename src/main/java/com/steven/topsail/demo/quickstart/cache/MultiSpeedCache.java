@@ -214,6 +214,7 @@ public class MultiSpeedCache extends AbstractValueAdaptingCache {
      */
     @Override
     public void evict(Object key) {
+        this.localCache.invalidate(key);
         this.version = DateFormatUtils.format(System.currentTimeMillis(), "ddHHmm");
         this.pubRedisClient.hset(VKEY, this.name, this.version);
     }

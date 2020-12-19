@@ -180,9 +180,13 @@ public class MultiSpeedCacheManager implements CacheManager {
             log.error("应用中未配置 'module-name' 属性，请在 application.yml 中加入配置");
         }
 
+        /**
+         * 多长时间未访问（Read/Write）则过期
+         */
         this.localCache = Caffeine.newBuilder()
                 .maximumSize(this.maximumSize)
-                .expireAfterWrite(this.durationMinutes, TimeUnit.MINUTES)
+                .expireAfterAccess(this.durationMinutes, TimeUnit.MINUTES)
+                .softValues()
                 .build();
 
         this.endpoints = builder.endpoints;
