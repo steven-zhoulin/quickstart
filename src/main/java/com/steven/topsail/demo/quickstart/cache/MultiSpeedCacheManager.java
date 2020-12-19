@@ -140,14 +140,12 @@ public class MultiSpeedCacheManager implements CacheManager {
      */
     private class SyncVersionThread extends Thread {
 
-        private static final String VKEY = "##==>BITS_CACHE_VERSION<==##";
-
         @Override
         public void run() {
             while (true) {
 
                 try {
-                    Map<String, String> newCacheVersion = pubRedisClient.hgetAll(VKEY);
+                    Map<String, String> newCacheVersion = pubRedisClient.hgetAll(MultiSpeedCache.VKEY);
                     if (newCacheVersion.size() > 0) {
                         cacheVersion = newCacheVersion;
 

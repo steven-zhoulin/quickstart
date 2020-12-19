@@ -1,6 +1,7 @@
 package com.steven.topsail.demo.quickstart.service.impl;
 
 import com.steven.topsail.demo.quickstart.service.IDemoService;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -19,4 +20,9 @@ public class DemoServiceImpl implements IDemoService {
         return name + ":" + age + ":" + male + ":" + UUID.randomUUID().toString();
     }
 
+    @CacheEvict("randomString")
+    @Override
+    public void clear() {
+        return;
+    }
 }

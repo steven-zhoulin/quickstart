@@ -6,4 +6,6 @@ package com.steven.topsail.demo.quickstart.service;
  */
 public interface IDemoService {
     String randomString(String name, Long age, boolean male);
+
+    void clear();
 }

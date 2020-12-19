@@ -23,8 +23,14 @@ public class DemoController {
     @GetMapping("cache/{name}/{age}/{male}")
     public String cache(@PathVariable("name") String name,
                         @PathVariable("age") Long age,
-                        @PathVariable("male") boolean male) throws IOException {
+                        @PathVariable("male") boolean male) {
         return demoServiceImpl.randomString(name, age, male);
+    }
+
+    @GetMapping("clear")
+    public String clear() {
+        demoServiceImpl.clear();
+        return "ok";
     }
 
 }

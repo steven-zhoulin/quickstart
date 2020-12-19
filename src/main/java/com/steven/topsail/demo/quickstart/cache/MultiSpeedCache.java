@@ -20,6 +20,8 @@ import java.util.concurrent.Callable;
 @Slf4j
 public class MultiSpeedCache extends AbstractValueAdaptingCache {
 
+    public static final String VKEY = "##==>BITS_CACHE_VERSION<==##";
+
     /**
      * 模块名
      */
@@ -213,6 +215,7 @@ public class MultiSpeedCache extends AbstractValueAdaptingCache {
     @Override
     public void evict(Object key) {
         this.version = DateFormatUtils.format(System.currentTimeMillis(), "ddHHmm");
+        this.pubRedisClient.hset(VKEY, this.name, this.version);
     }
 
     /**
@@ -221,6 +224,7 @@ public class MultiSpeedCache extends AbstractValueAdaptingCache {
     @Override
     public void clear() {
         this.version = DateFormatUtils.format(System.currentTimeMillis(), "ddHHmm");
+        this.pubRedisClient.hset(VKEY, this.name, this.version);
     }
 
     private String createCacheKey(Object key) {
