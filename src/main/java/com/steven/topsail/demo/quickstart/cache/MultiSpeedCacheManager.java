@@ -181,7 +181,7 @@ public class MultiSpeedCacheManager implements CacheManager {
         }
 
         /**
-         * 多长时间未访问（Read/Write）则过期
+         * 多长时间未访问（Read/Write）则过期，开启 softValues，以防内存溢出。
          */
         this.localCache = Caffeine.newBuilder()
                 .maximumSize(this.maximumSize)
