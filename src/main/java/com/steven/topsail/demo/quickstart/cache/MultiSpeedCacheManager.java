@@ -28,20 +28,6 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class MultiSpeedCacheManager implements CacheManager {
 
-    /**
-     * 本地缓存（一级缓存）
-     */
-    private com.github.benmanes.caffeine.cache.Cache<String, Object> localCache =
-            Caffeine.newBuilder()
-                    .maximumSize(50000)
-                    .expireAfterWrite(10, TimeUnit.MINUTES)
-                    .build();
-
-    /**
-     * 分布式缓存（二级缓存）
-     */
-    private RedisClient pubRedisClient;
-
     private ConcurrentMap<String, MultiSpeedCache> cacheMap = new ConcurrentHashMap<>(512);
 
     /**
@@ -55,43 +41,29 @@ public class MultiSpeedCacheManager implements CacheManager {
     private String moduleName;
 
     /**
-     * 上报版本
+     * 本地缓存（一级缓存）
      */
-    private List<Endpoint> endpoints = new ArrayList<>();
+    private com.github.benmanes.caffeine.cache.Cache<String, Object> localCache;
 
-    public void setEndpoints(String stringEndpoints) {
-        String[] stringEndpoint = stringEndpoints.split(",");
-        for (String string : stringEndpoint) {
-            String[] split = string.split(":");
-            Endpoint endpoint = new Endpoint();
-            try {
-                endpoint.setInetAddress(InetAddress.getByName(split[0]));
-            } catch (UnknownHostException e) {
-                e.printStackTrace();
-            }
-            endpoint.setPort(Integer.parseInt(split[1]));
-            endpoints.add(endpoint);
-        }
-    }
+    /**
+     * 分布式缓存（二级缓存）
+     */
+    private RedisClient pubRedisClient;
 
-    public MultiSpeedCacheManager(RedisClient pubRedisClient) {
-        this.pubRedisClient = pubRedisClient;
+    /**
+     * 本地缓存数量上限
+     */
+    private long maximumSize;
 
-        this.moduleName = "no_module_name";
-        try {
-            moduleName = SpringContextUtils.getPropertyValue("module-name");
-        } catch (Exception e) {
-            log.error("应用中未配置 'module-name' 属性，请在 application.yml 中加入配置");
-        }
+    /**
+     * 本地缓存最大生存时间（单位：分钟）
+     */
+    private long durationMinutes;
 
-        /**
-         * 版本同步线程
-         */
-        SyncVersionThread syncVersionThread = new SyncVersionThread();
-        syncVersionThread.setDaemon(true);
-        syncVersionThread.start();
-        log.info("开启缓存版本同步线程...");
-    }
+    /**
+     * 上报缓存版本缺失的端点
+     */
+    private List<Endpoint> endpoints;
 
     /**
      * Get the cache associated with the given name.
@@ -129,7 +101,7 @@ public class MultiSpeedCacheManager implements CacheManager {
     /**
      * 上报缺失版本的缓存名
      *
-     * @param name
+     * @param name 缓存名
      */
     private void reportMissVersion(String name) {
         byte[] bytes = name.getBytes();
@@ -158,7 +130,7 @@ public class MultiSpeedCacheManager implements CacheManager {
 
     @Setter
     @Getter
-    private class Endpoint {
+    private static class Endpoint {
         private InetAddress inetAddress;
         private int port;
     }
@@ -193,10 +165,78 @@ public class MultiSpeedCacheManager implements CacheManager {
                 } catch (Throwable e) {
                     e.printStackTrace();
                 }
-
             }
         }
 
+    }
+
+    private MultiSpeedCacheManager(Builder builder) {
+        this.pubRedisClient = builder.pubRedisClient;
+        this.maximumSize = builder.maximumSize;
+        this.durationMinutes = builder.durationMinutes;
+
+        this.moduleName = "no_module_name";
+        try {
+            moduleName = SpringContextUtils.getPropertyValue("module-name");
+        } catch (Exception e) {
+            log.error("应用中未配置 'module-name' 属性，请在 application.yml 中加入配置");
+        }
+
+        this.localCache = Caffeine.newBuilder()
+                .maximumSize(this.maximumSize)
+                .expireAfterWrite(this.durationMinutes, TimeUnit.MINUTES)
+                .build();
+
+        this.endpoints = builder.endpoints;
+
+        // 版本同步线程
+        SyncVersionThread syncVersionThread = new SyncVersionThread();
+        syncVersionThread.setDaemon(true);
+        syncVersionThread.start();
+        log.info("Start SyncVersionThread");
+    }
+
+    public static class Builder {
+        private RedisClient pubRedisClient;
+        private long maximumSize;
+        private long durationMinutes;
+        private List<Endpoint> endpoints = new ArrayList<>();
+
+        public Builder pubRedisClient(RedisClient pubRedisClient) {
+            this.pubRedisClient = pubRedisClient;
+            return this;
+        }
+
+        public Builder maximumSize(long maximumSize) {
+            this.maximumSize = maximumSize;
+            return this;
+        }
+
+        public Builder durationMinutes(long durationMinutes) {
+            this.durationMinutes = durationMinutes;
+            return this;
+        }
+
+        public Builder stringEndpoints(String stringEndpoints) {
+            String[] stringEndpoint = stringEndpoints.split(",");
+            for (String string : stringEndpoint) {
+                String[] split = string.split(":");
+                Endpoint endpoint = new Endpoint();
+                try {
+                    endpoint.setInetAddress(InetAddress.getByName(split[0]));
+                } catch (UnknownHostException e) {
+                    e.printStackTrace();
+                }
+                endpoint.setPort(Integer.parseInt(split[1]));
+                endpoints.add(endpoint);
+            }
+
+            return this;
+        }
+
+        public MultiSpeedCacheManager build() {
+            return new MultiSpeedCacheManager(this);
+        }
     }
 
 }

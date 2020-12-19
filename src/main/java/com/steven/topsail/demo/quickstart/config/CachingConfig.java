@@ -51,11 +51,23 @@ public class CachingConfig {
         @Value("${spring.cache.version.report.endpoints:127.0.0.1:1982}")
         private String endpoints;
 
+        @Value("${spring.cache.durationMinutes:1}")
+        private long durationMinutes;
+
+        @Value("${spring.cache.maximumSize:10000}")
+        private long maximumSize;
+
         @Bean
         public CacheManager cacheManager(RedisClient pubRedisClient) {
-            log.info("加载缓存管理器：MultiSpeedCacheManager, endpoints: {}", endpoints);
-            MultiSpeedCacheManager multiSpeedCacheManager = new MultiSpeedCacheManager(pubRedisClient);
-            multiSpeedCacheManager.setEndpoints(endpoints);
+            log.info("加载缓存管理器：MultiSpeedCacheManager, durationMinutes: {}, maximumSize: {}, endpoints: {}",
+                    durationMinutes, maximumSize, endpoints);
+
+            MultiSpeedCacheManager multiSpeedCacheManager = new MultiSpeedCacheManager.Builder()
+                    .durationMinutes(durationMinutes)
+                    .maximumSize(maximumSize)
+                    .pubRedisClient(pubRedisClient)
+                    .stringEndpoints(endpoints)
+                    .build();
             return multiSpeedCacheManager;
         }
 
