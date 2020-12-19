@@ -3,14 +3,18 @@ package com.steven.topsail.demo.quickstart.cache;
 import com.asiainfo.bits.core.redis.client.RedisClient;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.steven.topsail.demo.quickstart.util.SpringContextUtils;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
@@ -50,6 +54,26 @@ public class MultiSpeedCacheManager implements CacheManager {
      */
     private String moduleName;
 
+    /**
+     * 上报版本
+     */
+    private List<Endpoint> endpoints = new ArrayList<>();
+
+    public void setEndpoints(String stringEndpoints) {
+        String[] stringEndpoint = stringEndpoints.split(",");
+        for (String string : stringEndpoint) {
+            String[] split = string.split(":");
+            Endpoint endpoint = new Endpoint();
+            try {
+                endpoint.setInetAddress(InetAddress.getByName(split[0]));
+            } catch (UnknownHostException e) {
+                e.printStackTrace();
+            }
+            endpoint.setPort(Integer.parseInt(split[1]));
+            endpoints.add(endpoint);
+        }
+    }
+
     public MultiSpeedCacheManager(RedisClient pubRedisClient) {
         this.pubRedisClient = pubRedisClient;
 
@@ -66,6 +90,7 @@ public class MultiSpeedCacheManager implements CacheManager {
         SyncVersionThread syncVersionThread = new SyncVersionThread();
         syncVersionThread.setDaemon(true);
         syncVersionThread.start();
+        log.info("开启缓存版本同步线程...");
     }
 
     /**
@@ -88,7 +113,9 @@ public class MultiSpeedCacheManager implements CacheManager {
 
         String version = cacheVersion.get(name);
         if (null == version) {
-            version = "def";
+            version = "000000";
+            reportMissVersion(name);
+            log.warn("未找到缓存 {} 对应的版本号！", name);
             cacheVersion.put(name, version);
         }
 
@@ -100,6 +127,26 @@ public class MultiSpeedCacheManager implements CacheManager {
     }
 
     /**
+     * 上报缺失版本的缓存名
+     *
+     * @param name
+     */
+    private void reportMissVersion(String name) {
+        byte[] bytes = name.getBytes();
+        try {
+            for (Endpoint endpoint : endpoints) {
+                DatagramPacket datagramPacket = new DatagramPacket(
+                        bytes, bytes.length, endpoint.getInetAddress(), endpoint.getPort());
+                DatagramSocket datagramSocket = new DatagramSocket();
+                datagramSocket.send(datagramPacket);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    /**
      * Get a collection of the cache names known by this manager.
      *
      * @return the names of all caches known by the cache manager
@@ -107,6 +154,13 @@ public class MultiSpeedCacheManager implements CacheManager {
     @Override
     public Collection<String> getCacheNames() {
         return Collections.unmodifiableSet(cacheMap.keySet());
+    }
+
+    @Setter
+    @Getter
+    private class Endpoint {
+        private InetAddress inetAddress;
+        private int port;
     }
 
     /**

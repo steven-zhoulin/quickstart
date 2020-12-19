@@ -3,6 +3,7 @@ package com.steven.topsail.demo.quickstart.config;
 import com.asiainfo.bits.core.redis.client.RedisClient;
 import com.steven.topsail.demo.quickstart.cache.MultiSpeedCacheManager;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CachingConfigurerSupport;
@@ -47,10 +48,15 @@ public class CachingConfig {
         @Resource(name = "pubRedisClient")
         private RedisClient pubRedisClient;
 
+        @Value("${spring.cache.version.report.endpoints:127.0.0.1:1982}")
+        private String endpoints;
+
         @Bean
         public CacheManager cacheManager(RedisClient pubRedisClient) {
-            log.info("加载缓存管理器：MultiSpeedCacheManager...");
-            return new MultiSpeedCacheManager(pubRedisClient);
+            log.info("加载缓存管理器：MultiSpeedCacheManager, endpoints: {}", endpoints);
+            MultiSpeedCacheManager multiSpeedCacheManager = new MultiSpeedCacheManager(pubRedisClient);
+            multiSpeedCacheManager.setEndpoints(endpoints);
+            return multiSpeedCacheManager;
         }
 
     }
