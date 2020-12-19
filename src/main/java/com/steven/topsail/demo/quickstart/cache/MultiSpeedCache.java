@@ -14,6 +14,9 @@ import java.util.concurrent.Callable;
 /**
  * 多级缓存
  *
+ * TODO: 1.缓存穿透的问题。2.搞懂未实现接口的用途。
+ *
+ *
  * @author Steven
  * @date 2020-12-12
  */
