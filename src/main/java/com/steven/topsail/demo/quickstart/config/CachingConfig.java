@@ -1,7 +1,7 @@
 package com.steven.topsail.demo.quickstart.config;
 
 import com.asiainfo.bits.core.redis.client.RedisClient;
-import com.steven.topsail.demo.quickstart.cache.MultiLevelCacheManager;
+import com.steven.topsail.demo.quickstart.cache.MultiSpeedCacheManager;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.CacheManager;
@@ -49,8 +49,8 @@ public class CachingConfig {
 
         @Bean
         public CacheManager cacheManager(RedisClient pubRedisClient) {
-            log.info("加载缓存管理器：RedisCaffeineCacheManager...");
-            return new MultiLevelCacheManager(pubRedisClient);
+            log.info("加载缓存管理器：MultiSpeedCacheManager...");
+            return new MultiSpeedCacheManager(pubRedisClient);
         }
 
     }

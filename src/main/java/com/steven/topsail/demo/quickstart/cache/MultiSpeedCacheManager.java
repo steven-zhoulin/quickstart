@@ -22,38 +22,42 @@ import java.util.concurrent.TimeUnit;
  * @date 2020-12-12
  */
 @Slf4j
-public class MultiLevelCacheManager implements CacheManager {
+public class MultiSpeedCacheManager implements CacheManager {
 
     /**
-     * 本地缓存
+     * 本地缓存（一级缓存）
      */
-    private com.github.benmanes.caffeine.cache.Cache<String, Object> localCache = Caffeine.newBuilder()
-        .maximumSize(50000)
-        .expireAfterWrite(10, TimeUnit.MINUTES)
-        .build();
+    private com.github.benmanes.caffeine.cache.Cache<String, Object> localCache =
+            Caffeine.newBuilder()
+                    .maximumSize(50000)
+                    .expireAfterWrite(10, TimeUnit.MINUTES)
+                    .build();
 
-    private ConcurrentMap<String, MultiLevelCache> cacheMap = new ConcurrentHashMap<>(512);
+    /**
+     * 分布式缓存（二级缓存）
+     */
+    private RedisClient pubRedisClient;
+
+    private ConcurrentMap<String, MultiSpeedCache> cacheMap = new ConcurrentHashMap<>(512);
 
     /**
      * 版本号
      */
     private Map<String, String> cacheVersion = new HashMap<>(512);
 
-    private RedisClient pubRedisClient;
-
     /**
      * 模块名
      */
     private String moduleName;
 
-    public MultiLevelCacheManager(RedisClient pubRedisClient) {
+    public MultiSpeedCacheManager(RedisClient pubRedisClient) {
         this.pubRedisClient = pubRedisClient;
 
         this.moduleName = "no_module_name";
         try {
             moduleName = SpringContextUtils.getPropertyValue("module-name");
         } catch (Exception e) {
-            log.error("应用中未配置'module-name'属性，请在application.yml中加入配置");
+            log.error("应用中未配置 'module-name' 属性，请在 application.yml 中加入配置");
         }
 
         /**
@@ -76,22 +80,22 @@ public class MultiLevelCacheManager implements CacheManager {
     @Override
     public Cache getCache(String name) {
 
-        MultiLevelCache multiLevelCache = cacheMap.get(name);
+        MultiSpeedCache multiSpeedCache = cacheMap.get(name);
 
-        if (null != multiLevelCache) {
-            return multiLevelCache;
+        if (null != multiSpeedCache) {
+            return multiSpeedCache;
         }
 
         String version = cacheVersion.get(name);
         if (null == version) {
             version = "def";
-            cacheVersion.putIfAbsent(name, version);
+            cacheVersion.put(name, version);
         }
 
-        multiLevelCache = new MultiLevelCache(moduleName, name, version, pubRedisClient, localCache);
-        cacheMap.putIfAbsent(name, multiLevelCache);
+        multiSpeedCache = new MultiSpeedCache(moduleName, name, version, pubRedisClient, localCache);
+        cacheMap.put(name, multiSpeedCache);
 
-        return multiLevelCache;
+        return multiSpeedCache;
 
     }
 
@@ -118,12 +122,17 @@ public class MultiLevelCacheManager implements CacheManager {
 
                 try {
                     Map<String, String> newCacheVersion = pubRedisClient.hgetAll(VKEY);
-                    cacheVersion = newCacheVersion;
+                    if (newCacheVersion.size() > 0) {
+                        cacheVersion = newCacheVersion;
 
-                    for (String name : cacheMap.keySet()) {
-                        MultiLevelCache multiLevelCache = cacheMap.get(name);
-                        String version = cacheVersion.get(name);
-                        multiLevelCache.setVersion(version);
+                        for (String name : cacheMap.keySet()) {
+                            MultiSpeedCache multiLevelCache = cacheMap.get(name);
+                            String version = cacheVersion.get(name);
+                            if (null != version) {
+                                multiLevelCache.setVersion(version);
+                            }
+                        }
+
                     }
 
                     Thread.sleep(60000);

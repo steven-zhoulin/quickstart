@@ -18,7 +18,7 @@ import java.util.concurrent.Callable;
  * @date 2020-12-12
  */
 @Slf4j
-public class MultiLevelCache extends AbstractValueAdaptingCache {
+public class MultiSpeedCache extends AbstractValueAdaptingCache {
 
     /**
      * 模块名
@@ -49,7 +49,7 @@ public class MultiLevelCache extends AbstractValueAdaptingCache {
      */
     private static final long EXPIRATION_TIMEOUT = 86400 * 28;
 
-    public MultiLevelCache(String moduleName,
+    public MultiSpeedCache(String moduleName,
                            String name,
                            String version,
                            RedisClient pubRedisClient,
