@@ -1,6 +1,7 @@
 package com.steven.topsail.demo.quickstart.service.impl;
 
 import com.steven.topsail.demo.quickstart.service.IDemoService;
+import org.apache.commons.lang3.RandomUtils;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -17,8 +18,13 @@ public class DemoServiceImpl implements IDemoService {
     @Cacheable(value = "c1")
     @Override
     public String randomString(String name, Long age, boolean male) {
-
-        return name + ":" + age + ":" + male + ":" + UUID.randomUUID().toString();
+        if (male) {
+            System.out.println("不为空!");
+            return name + ":" + age + ":" + male + ":" + UUID.randomUUID().toString();
+        } else {
+            System.out.println("为空!!!");
+            return null;
+        }
     }
 
     @CacheEvict(value = "c1")

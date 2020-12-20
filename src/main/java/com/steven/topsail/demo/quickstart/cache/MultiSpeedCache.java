@@ -104,6 +104,8 @@ public class MultiSpeedCache extends AbstractValueAdaptingCache {
      * 1. 先在本地缓存中查找
      * 2. 再在分布式缓存中查找
      *
+     * 如果 value 是一个 NullValue，则会返回一个被 ValueWrapper 包装的
+     *
      * @param key
      * @return
      */
@@ -148,9 +150,8 @@ public class MultiSpeedCache extends AbstractValueAdaptingCache {
     }
 
     /**
-     * Associate the specified value with the specified key in this cache.
-     * <p>If the cache previously contained a mapping for this key, the old
-     * value is replaced by the specified value.
+     * 将 KV 同时保存到本地缓存和分布式缓存。
+     * 如果 value 为 null，会对其做 NullValue 包装，以解决缓存穿透的问题。
      *
      * @param key   the key with which the specified value is to be associated
      * @param value the value to be associated with the specified key
@@ -166,24 +167,15 @@ public class MultiSpeedCache extends AbstractValueAdaptingCache {
 
     @Override
     public ValueWrapper putIfAbsent(Object key, Object value) {
-        log.debug("putIfAbsent {} -> {}", key, value);
         String cacheKey = createCacheKey(key);
+        log.debug("putIfAbsent {}", key);
+
         Object storeValue = toStoreValue(value);
-        boolean result = false;
-        try {
-            result = pubRedisClient.setnx(cacheKey, value);
-        } catch (Exception e) {
-            log.error("Redis 执行 setnx 失败", e);
-            // Redis 挂了，暂时使用本地缓存，注意用作分布式锁时将在多应用中失效
-            localCache.put(cacheKey, value);
-        }
+        boolean result = pubRedisClient.setnx(cacheKey, storeValue);
         if (result) {
-            // redis更新成功，本地缓存直接覆盖
             localCache.put(cacheKey, value);
         }
-        return toValueWrapper(value);
-//        Object existing = this.store.putIfAbsent(key, toStoreValue(value));
-//        return toValueWrapper(existing);
+        return toValueWrapper(storeValue);
     }
 
     /**
