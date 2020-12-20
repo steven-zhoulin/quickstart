@@ -7,15 +7,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.time.DateFormatUtils;
 import org.springframework.cache.support.AbstractValueAdaptingCache;
 import org.springframework.lang.Nullable;
+import org.springframework.util.Assert;
 
 import java.util.Objects;
 import java.util.concurrent.Callable;
 
 /**
  * 多级缓存
- *
+ * <p>
  * TODO: 1.缓存穿透的问题。2.搞懂未实现接口的用途。
- *
  *
  * @author Steven
  * @date 2020-12-12
@@ -44,6 +44,8 @@ public class MultiSpeedCache extends AbstractValueAdaptingCache {
 
     private RedisClient pubRedisClient;
 
+    private MultiSpeedCacheManager multiSpeedCacheManager;
+
     /**
      * 本地缓存，采用共享模式
      */
@@ -54,24 +56,28 @@ public class MultiSpeedCache extends AbstractValueAdaptingCache {
      */
     private static final long EXPIRATION_TIMEOUT = 86400 * 28;
 
-    public MultiSpeedCache(String moduleName,
-                           String name,
-                           String version,
-                           RedisClient pubRedisClient,
-                           com.github.benmanes.caffeine.cache.Cache<String, Object> localCache) {
+    private MultiSpeedCache(MultiSpeedCache.Builder builder) {
         super(true);
-        this.moduleName = moduleName;
-        this.name = name;
-        this.version = version;
-        this.pubRedisClient = pubRedisClient;
-        this.localCache = localCache;
+
+        Assert.notNull(builder.name, "name must not be null");
+        Assert.notNull(builder.version, "version must not be null");
+        Assert.notNull(builder.pubRedisClient, "pubRedisClient must not be null");
+        Assert.notNull(builder.localCache, "localCache must not be null");
+        Assert.notNull(builder.multiSpeedCacheManager, "multiSpeedCacheManager must no be null");
+
+        this.moduleName = builder.moduleName;
+        this.name = builder.name;
+        this.version = builder.version;
+        this.pubRedisClient = builder.pubRedisClient;
+        this.localCache = builder.localCache;
+        this.multiSpeedCacheManager = builder.multiSpeedCacheManager;
     }
 
     /**
      * Return the cache name.
      */
     @Override
-    public String getName() {
+    public final String getName() {
         return this.name;
     }
 
@@ -79,7 +85,7 @@ public class MultiSpeedCache extends AbstractValueAdaptingCache {
      * Return the underlying native cache provider.
      */
     @Override
-    public Object getNativeCache() {
+    public final com.github.benmanes.caffeine.cache.Cache<String, Object> getNativeCache() {
         return this.localCache;
     }
 
@@ -91,63 +97,54 @@ public class MultiSpeedCache extends AbstractValueAdaptingCache {
      */
     @Override
     protected Object lookup(Object cacheKey) {
-        Object value = localCache.getIfPresent(cacheKey);
-        log.info("lookup {} -> {}", cacheKey, value);
-        return value;
+        return localCache.getIfPresent(cacheKey);
     }
 
+    /**
+     * 1. 先在本地缓存中查找
+     * 2. 再在分布式缓存中查找
+     *
+     * @param key
+     * @return
+     */
     @Override
     @Nullable
     public ValueWrapper get(Object key) {
         String cacheKey = createCacheKey(key);
         Object value = lookup(cacheKey);
 
-        log.info("get {}", cacheKey);
-
-        if (value != null) {
-            log.info("local hit: {}", cacheKey);
+        if (null != value) {
+            log.trace("Local  hit: {}", cacheKey);
             return toValueWrapper(value);
         }
 
-        // 从Redis中查找
-        try {
-            value = pubRedisClient.getObject(cacheKey);
-        } catch (RuntimeException e) {
-            log.error("Redis获取缓存异常", e);
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            // Redis 产生异常也需要将值写入 Caffeine 中并返回
-            if (null != value) {
-                log.info("remote hit: {} -> {}", cacheKey, value);
-                localCache.put(cacheKey, value);
-            }
+        value = pubRedisClient.getObject(cacheKey);
+        if (null != value) {
+            log.trace("Remote hit: {}", cacheKey);
+            localCache.put(cacheKey, value);
         }
 
         return toValueWrapper(value);
     }
 
-    /**
-     * Return the value to which this cache maps the specified key, obtaining
-     * that value from {@code valueLoader} if necessary. This method provides
-     * a simple substitute for the conventional "if cached, return; otherwise
-     * create, cache and return" pattern.
-     * <p>If possible, implementations should ensure that the loading operation
-     * is synchronized so that the specified {@code valueLoader} is only called
-     * once in case of concurrent access on the same key.
-     * <p>If the {@code valueLoader} throws an exception, it is wrapped in
-     * a {@link ValueRetrievalException}
-     *
-     * @param key         the key whose associated value is to be returned
-     * @param valueLoader
-     * @return the value to which this cache maps the specified key
-     * @throws ValueRetrievalException if the {@code valueLoader} throws an exception
-     * @see #get(Object)
-     * @since 4.3
-     */
     @Override
     public <T> T get(Object key, Callable<T> valueLoader) {
-        throw new RuntimeException("get(Object key, Callable<T> valueLoader)");
+        log.info("invoke MultiSpeedCache.get(Object key, Callable<T> valueLoader), key: {}", key);
+        String cacheKey = createCacheKey(key);
+        Object value = localCache.getIfPresent(cacheKey);
+        if (null == value) {
+            value = pubRedisClient.get(cacheKey);
+            if (null == value) {
+                try {
+                    value = toStoreValue(valueLoader.call());
+                } catch (Throwable e) {
+                    throw new ValueRetrievalException(key, valueLoader, e);
+                }
+            }
+        }
+
+        return (T) fromStoreValue(value);
+
     }
 
     /**
@@ -161,40 +158,17 @@ public class MultiSpeedCache extends AbstractValueAdaptingCache {
     @Override
     public void put(Object key, Object value) {
         String cacheKey = createCacheKey(key);
-        log.info("put {} -> {}", cacheKey, value);
-        localCache.put(cacheKey, value);
-        pubRedisClient.set(cacheKey, value, EXPIRATION_TIMEOUT);
+        log.trace("put {}", cacheKey);
+        Object storeValue = toStoreValue(value);
+        localCache.put(cacheKey, storeValue);
+        pubRedisClient.set(cacheKey, storeValue, EXPIRATION_TIMEOUT);
     }
 
-    /**
-     * Atomically associate the specified value with the specified key in this cache
-     * if it is not set already.
-     * <p>This is equivalent to:
-     * <pre><code>
-     * ValueWrapper existingValue = cache.get(key);
-     * if (existingValue == null) {
-     *     cache.put(key, value);
-     * }
-     * return existingValue;
-     * </code></pre>
-     * except that the action is performed atomically. While all out-of-the-box
-     * {@link CacheManager} implementations are able to perform the put atomically,
-     * the operation may also be implemented in two steps, e.g. with a check for
-     * presence and a subsequent put, in a non-atomic way. Check the documentation
-     * of the native cache implementation that you are using for more details.
-     *
-     * @param key   the key with which the specified value is to be associated
-     * @param value the value to be associated with the specified key
-     * @return the value to which this cache maps the specified key (which may be
-     * {@code null} itself), or also {@code null} if the cache did not contain any
-     * mapping for that key prior to this call. Returning {@code null} is therefore
-     * an indicator that the given {@code value} has been associated with the key.
-     * @see #put(Object, Object)
-     * @since 4.1
-     */
     @Override
     public ValueWrapper putIfAbsent(Object key, Object value) {
+        log.debug("putIfAbsent {} -> {}", key, value);
         String cacheKey = createCacheKey(key);
+        Object storeValue = toStoreValue(value);
         boolean result = false;
         try {
             result = pubRedisClient.setnx(cacheKey, value);
@@ -208,6 +182,8 @@ public class MultiSpeedCache extends AbstractValueAdaptingCache {
             localCache.put(cacheKey, value);
         }
         return toValueWrapper(value);
+//        Object existing = this.store.putIfAbsent(key, toStoreValue(value));
+//        return toValueWrapper(existing);
     }
 
     /**
@@ -217,9 +193,7 @@ public class MultiSpeedCache extends AbstractValueAdaptingCache {
      */
     @Override
     public void evict(Object key) {
-        this.localCache.invalidate(key);
-        this.version = DateFormatUtils.format(System.currentTimeMillis(), "ddHHmm");
-        this.pubRedisClient.hset(VKEY, this.name, this.version);
+        this.clear();
     }
 
     /**
@@ -227,7 +201,10 @@ public class MultiSpeedCache extends AbstractValueAdaptingCache {
      */
     @Override
     public void clear() {
-        this.version = DateFormatUtils.format(System.currentTimeMillis(), "ddHHmm");
+        log.trace("Clear...");
+        long now = System.currentTimeMillis();
+        multiSpeedCacheManager.saveOrUpdateVersion(this.name, now);
+        version = DateFormatUtils.format(now, "ddHHmm");
         this.pubRedisClient.hset(VKEY, this.name, this.version);
     }
 
@@ -246,4 +223,47 @@ public class MultiSpeedCache extends AbstractValueAdaptingCache {
         return buffer.toString();
     }
 
+    public static class Builder {
+
+        private String moduleName;
+        private String name;
+        private String version;
+        private RedisClient pubRedisClient;
+        private com.github.benmanes.caffeine.cache.Cache<String, Object> localCache;
+        private MultiSpeedCacheManager multiSpeedCacheManager;
+
+        public MultiSpeedCache.Builder moduleName(String moduleName) {
+            this.moduleName = moduleName;
+            return this;
+        }
+
+        public MultiSpeedCache.Builder name(String name) {
+            this.name = name;
+            return this;
+        }
+
+        public MultiSpeedCache.Builder version(String version) {
+            this.version = version;
+            return this;
+        }
+
+        public MultiSpeedCache.Builder pubRedisClient(RedisClient pubRedisClient) {
+            this.pubRedisClient = pubRedisClient;
+            return this;
+        }
+
+        public MultiSpeedCache.Builder localCache(com.github.benmanes.caffeine.cache.Cache<String, Object> localCache) {
+            this.localCache = localCache;
+            return this;
+        }
+
+        public MultiSpeedCache.Builder multiSpeedCacheManager(MultiSpeedCacheManager multiSpeedCacheManager) {
+            this.multiSpeedCacheManager = multiSpeedCacheManager;
+            return this;
+        }
+
+        public MultiSpeedCache build() {
+            return new MultiSpeedCache(this);
+        }
+    }
 }

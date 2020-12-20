@@ -6,6 +6,7 @@ import com.steven.topsail.demo.quickstart.util.SpringContextUtils;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.time.DateFormatUtils;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 
@@ -86,12 +87,20 @@ public class MultiSpeedCacheManager implements CacheManager {
         String version = cacheVersion.get(name);
         if (null == version) {
             version = "000000";
-            reportMissVersion(name);
+            saveOrUpdateVersion(name, System.currentTimeMillis());
             log.warn("未找到缓存 {} 对应的版本号！", name);
             cacheVersion.put(name, version);
         }
 
-        multiSpeedCache = new MultiSpeedCache(moduleName, name, version, pubRedisClient, localCache);
+        multiSpeedCache = new MultiSpeedCache.Builder()
+                .moduleName(moduleName)
+                .name(name)
+                .version(version)
+                .pubRedisClient(pubRedisClient)
+                .localCache(localCache)
+                .multiSpeedCacheManager(this)
+                .build();
+
         cacheMap.put(name, multiSpeedCache);
 
         return multiSpeedCache;
@@ -103,8 +112,9 @@ public class MultiSpeedCacheManager implements CacheManager {
      *
      * @param name 缓存名
      */
-    private void reportMissVersion(String name) {
-        byte[] bytes = name.getBytes();
+    public void saveOrUpdateVersion(String name, long now) {
+        String content = name + "|" + DateFormatUtils.format(now, "yyyy-MM-dd HH:mm:ss");
+        byte[] bytes = content.getBytes();
         try {
             for (Endpoint endpoint : endpoints) {
                 DatagramPacket datagramPacket = new DatagramPacket(
@@ -117,6 +127,8 @@ public class MultiSpeedCacheManager implements CacheManager {
         }
 
     }
+
+
 
     /**
      * Get a collection of the cache names known by this manager.

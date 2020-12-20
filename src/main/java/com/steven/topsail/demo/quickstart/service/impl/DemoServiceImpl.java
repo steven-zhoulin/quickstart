@@ -20,7 +20,7 @@ public class DemoServiceImpl implements IDemoService {
         return name + ":" + age + ":" + male + ":" + UUID.randomUUID().toString();
     }
 
-    @CacheEvict("randomString")
+    @CacheEvict(value = "randomString")
     @Override
     public void clear() {
         return;
