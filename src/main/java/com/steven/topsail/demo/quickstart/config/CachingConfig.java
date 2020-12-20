@@ -74,6 +74,7 @@ public class CachingConfig {
     }
 
     static class MyKeyGenerator extends CachingConfigurerSupport {
+
         /**
          * 自定义缓存key：@类名.方法名(参数值)
          */
@@ -82,9 +83,26 @@ public class CachingConfig {
         public KeyGenerator keyGenerator() {
             log.info("自定义缓存 KeyGenerator...");
             return (target, method, params) -> {
-                String className = target.getClass().getName();
+
+                Class<?> targetClass = target.getClass();
+                String simpleName = targetClass.getSimpleName();
+                String packageName = targetClass.getPackage().getName();
+
+                StringBuilder buff = new StringBuilder(packageName.length() * 2);
+                char[] chars = packageName.toCharArray();
+
+                buff.append("@").append(chars[0]);
+                for (int i = 1; i < chars.length; i++) {
+                    if ('.' == chars[i]) {
+                        char c = chars[i + 1];
+                        buff.append('.').append(c);
+                        i++;
+                    }
+                }
+
+                buff.append('.').append(simpleName).append('.').append(method.getName());
                 String paramsStr = Arrays.stream(params).map(String::valueOf).collect(joining(",", "(", ")"));
-                return "@" + className + "." + method.getName() + paramsStr;
+                return buff.append(paramsStr).toString();
             };
         }
     }

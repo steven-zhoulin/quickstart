@@ -14,13 +14,14 @@ import java.util.UUID;
 @Service
 public class DemoServiceImpl implements IDemoService {
 
-    @Cacheable("randomString")
+    @Cacheable(value = "c1")
     @Override
     public String randomString(String name, Long age, boolean male) {
+
         return name + ":" + age + ":" + male + ":" + UUID.randomUUID().toString();
     }
 
-    @CacheEvict(value = "randomString")
+    @CacheEvict(value = "c1")
     @Override
     public void clear() {
         return;
