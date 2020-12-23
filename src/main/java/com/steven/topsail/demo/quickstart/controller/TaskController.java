@@ -1,7 +1,7 @@
 package com.steven.topsail.demo.quickstart.controller;
 
-import com.steven.topsail.demo.quickstart.task.CronTaskRegistry;
-import com.steven.topsail.demo.quickstart.task.SchedulingRunnable;
+import com.steven.topsail.demo.quickstart.task.autorefresh.CronTaskRegistry;
+import com.steven.topsail.demo.quickstart.task.autorefresh.SchedulingRunnable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

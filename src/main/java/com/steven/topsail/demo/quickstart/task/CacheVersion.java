@@ -17,4 +17,5 @@ public class CacheVersion {
     private String name;
     private LocalDateTime version;
     private String syncCron;
+    private String state;
 }

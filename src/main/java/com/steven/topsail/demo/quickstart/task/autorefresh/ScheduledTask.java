@@ -1,4 +1,4 @@
-package com.steven.topsail.demo.quickstart.task;
+package com.steven.topsail.demo.quickstart.task.autorefresh;
 
 import java.util.concurrent.ScheduledFuture;
 
@@ -9,15 +9,14 @@ import java.util.concurrent.ScheduledFuture;
  */
 public final class ScheduledTask {
 
-    volatile ScheduledFuture future;
+    volatile ScheduledFuture scheduledFuture;
 
     /**
      * 取消定时任务
      */
     public void cancel() {
-        ScheduledFuture future = this.future;
-        if (future != null) {
-            future.cancel(true);
+        if (null != scheduledFuture) {
+            scheduledFuture.cancel(true);
         }
     }
 }

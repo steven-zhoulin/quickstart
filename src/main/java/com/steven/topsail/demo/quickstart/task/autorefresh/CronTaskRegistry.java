@@ -1,4 +1,4 @@
-package com.steven.topsail.demo.quickstart.task;
+package com.steven.topsail.demo.quickstart.task.autorefresh;
 
 import lombok.Getter;
 import org.springframework.beans.factory.DisposableBean;
@@ -56,7 +56,7 @@ public class CronTaskRegistry implements DisposableBean {
 
     public ScheduledTask scheduleCronTask(CronTask cronTask) {
         ScheduledTask scheduledTask = new ScheduledTask();
-        scheduledTask.future = this.taskScheduler.schedule(cronTask.getRunnable(), cronTask.getTrigger());
+        scheduledTask.scheduledFuture = this.taskScheduler.schedule(cronTask.getRunnable(), cronTask.getTrigger());
         return scheduledTask;
     }
 
