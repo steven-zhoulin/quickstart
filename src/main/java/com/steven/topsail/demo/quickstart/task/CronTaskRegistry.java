@@ -38,7 +38,7 @@ public class CronTaskRegistry implements DisposableBean {
     }
 
     public void addCronTask(CronTask cronTask) {
-        if (cronTask != null) {
+        if (null != cronTask) {
             Runnable task = cronTask.getRunnable();
             if (this.scheduledTasks.containsKey(task)) {
                 removeCronTask(task);
@@ -49,7 +49,7 @@ public class CronTaskRegistry implements DisposableBean {
 
     public void removeCronTask(Runnable task) {
         ScheduledTask scheduledTask = this.scheduledTasks.remove(task);
-        if (scheduledTask != null) {
+        if (null != scheduledTask) {
             scheduledTask.cancel();
         }
     }

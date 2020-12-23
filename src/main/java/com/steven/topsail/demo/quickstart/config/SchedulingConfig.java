@@ -14,10 +14,9 @@ public class SchedulingConfig {
     @Bean
     public TaskScheduler taskScheduler() {
         ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
-        // 定时任务执行线程池核心线程数
         taskScheduler.setPoolSize(4);
         taskScheduler.setRemoveOnCancelPolicy(true);
-        taskScheduler.setThreadNamePrefix("TaskSchedulerThreadPool-");
+        taskScheduler.setThreadNamePrefix("AutoRefresh-");
         return taskScheduler;
     }
 }
