@@ -21,7 +21,7 @@ public class JobRunner implements CommandLineRunner {
 //    private SysJobMapper sysJobMapper;
 
     @Autowired
-    private CronTaskRegistrar cronTaskRegistrar;
+    private CronTaskRegistry cronTaskRegistry;
 
     @Override
     public void run(String... args) {
@@ -33,7 +33,7 @@ public class JobRunner implements CommandLineRunner {
         if (!CollectionUtils.isEmpty(jobList)) {
             for (CacheVersion job : jobList) {
                 SchedulingRunnable task = new SchedulingRunnable(job.getName());
-                cronTaskRegistrar.addCronTask(task, job.getSyncCron());
+                cronTaskRegistry.addCronTask(task, job.getSyncCron());
             }
             log.info("定时任务已加载完毕...");
         }

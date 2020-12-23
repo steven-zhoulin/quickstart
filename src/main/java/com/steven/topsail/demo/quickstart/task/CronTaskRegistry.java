@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @date 2020-12-22
  */
 @Component
-public class CronTaskRegistrar implements DisposableBean {
+public class CronTaskRegistry implements DisposableBean {
 
     /**
      * 缓存
