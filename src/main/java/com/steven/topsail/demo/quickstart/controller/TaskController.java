@@ -1,7 +1,7 @@
 package com.steven.topsail.demo.quickstart.controller;
 
-import com.steven.topsail.demo.quickstart.task.autorefresh.CronTaskRegistry;
-import com.steven.topsail.demo.quickstart.task.autorefresh.SchedulingRunnable;
+import com.steven.topsail.demo.quickstart.task.autorefresh.ScheduledTaskRegistry;
+import com.steven.topsail.demo.quickstart.task.autorefresh.FlushRunnable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,19 +17,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class TaskController {
 
     @Autowired
-    private CronTaskRegistry cronTaskRegistry;
+    private ScheduledTaskRegistry scheduledTaskRegistry;
 
     @GetMapping("reload/{n}")
     public String reload(@PathVariable("n") int n) {
 
-        for (Runnable runnable : cronTaskRegistry.getScheduledTasks().keySet()) {
-            cronTaskRegistry.getScheduledTasks().get(runnable).cancel();
-            cronTaskRegistry.getScheduledTasks().remove(runnable);
+        for (Runnable runnable : scheduledTaskRegistry.getScheduledTasks().keySet()) {
+            scheduledTaskRegistry.getScheduledTasks().get(runnable).cancel();
+            scheduledTaskRegistry.getScheduledTasks().remove(runnable);
         }
 
         for (int i = 1; i <= n; i++) {
-            SchedulingRunnable task = new SchedulingRunnable("任务:" + i);
-            cronTaskRegistry.addCronTask(task, "*/" + i + " * * * * *");
+            FlushRunnable task = new FlushRunnable("任务:" + i);
+            scheduledTaskRegistry.addCronTask(task, "*/" + i + " * * * * *");
 
         }
 

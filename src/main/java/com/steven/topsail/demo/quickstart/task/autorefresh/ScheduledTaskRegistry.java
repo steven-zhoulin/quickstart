@@ -11,11 +11,13 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
+ * 周期任务注册器
+ *
  * @author Steven
  * @date 2020-12-22
  */
 @Component
-public class CronTaskRegistry implements DisposableBean {
+public class ScheduledTaskRegistry implements DisposableBean {
 
     /**
      * 缓存
@@ -28,7 +30,7 @@ public class CronTaskRegistry implements DisposableBean {
 
     /**
      * 添加一个定时任务
-     * 其核心就是靠spring提供的 CronTask 类来实现
+     * 其核心就是靠 Spring 提供的 CronTask 类来实现
      *
      * @param task
      * @param cronExpression

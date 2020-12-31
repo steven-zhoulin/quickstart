@@ -3,7 +3,6 @@ package com.steven.topsail.demo.quickstart.task.autorefresh;
 import com.steven.topsail.demo.quickstart.task.CacheVersion;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.CommandLineRunner;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -12,6 +11,8 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
+ * 当表 CACHE_VERSION 表里的同步表达式配置发生变化后可自动生效
+ *
  * @author Steven
  * @date 2020-12-22
  */
@@ -20,7 +21,7 @@ import java.util.List;
 public class AutoReloadTask {
 
     @Autowired
-    private CronTaskRegistry cronTaskRegistry;
+    private ScheduledTaskRegistry scheduledTaskRegistry;
 
     @Scheduled(initialDelay = 10000, fixedDelay = 1000 * 6)
     public void reload() {
@@ -46,8 +47,8 @@ public class AutoReloadTask {
         }
 
         for (CacheVersion cacheVersion : cacheVersions) {
-            SchedulingRunnable task = new SchedulingRunnable(cacheVersion.getName());
-            cronTaskRegistry.addCronTask(task, cacheVersion.getSyncCron());
+            FlushRunnable task = new FlushRunnable(cacheVersion.getName());
+            scheduledTaskRegistry.addCronTask(task, cacheVersion.getSyncCron());
             log.info("加载定时刷新任务: {} -> {}", cacheVersion.getName(), cacheVersion.getSyncCron());
         }
         log.info("共加载定时刷新任务: {} 条", cacheVersions.size());
