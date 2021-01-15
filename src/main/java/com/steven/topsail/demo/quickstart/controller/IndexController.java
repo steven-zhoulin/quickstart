@@ -38,7 +38,6 @@ public class IndexController {
 
     @GetMapping("deleteIndex/{indexName}")
     public void delete(@PathVariable("indexName") String indexName) throws IOException {
-        log.info("删除索引: {}", indexName);
         indexService.deleteIndex(indexName);
     }
 

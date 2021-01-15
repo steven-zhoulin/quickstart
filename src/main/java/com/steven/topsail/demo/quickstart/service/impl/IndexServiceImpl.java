@@ -47,14 +47,14 @@ public class IndexServiceImpl implements IIndexService {
     /**
      * 删除索引
      *
-     * @param index
+     * @param indexName
      * @throws IOException
      */
     @Override
-    public void deleteIndex(String index) throws IOException {
-        log.info("删除索引: {}", index);
-        if (existsIndex(index)) {
-            DeleteIndexRequest deleteIndexRequest = new DeleteIndexRequest(index);
+    public void deleteIndex(String indexName) throws IOException {
+        log.info("删除索引: {}", indexName);
+        if (existsIndex(indexName)) {
+            DeleteIndexRequest deleteIndexRequest = new DeleteIndexRequest(indexName);
             AcknowledgedResponse delete = restHighLevelClient.indices().delete(deleteIndexRequest, RequestOptions.DEFAULT);
             log.info("删除响应: {}", delete.isAcknowledged());
         }
@@ -63,13 +63,13 @@ public class IndexServiceImpl implements IIndexService {
     /**
      * 判断索引是否存在
      *
-     * @param index
+     * @param indexName
      * @return
      * @throws IOException
      */
     @Override
-    public boolean existsIndex(String index) throws IOException {
-        GetIndexRequest getIndexRequest = new GetIndexRequest(index);
+    public boolean existsIndex(String indexName) throws IOException {
+        GetIndexRequest getIndexRequest = new GetIndexRequest(indexName);
         boolean exists = restHighLevelClient.indices().exists(getIndexRequest, RequestOptions.DEFAULT);
         log.debug("existsIndex: {}", exists);
         return exists;
