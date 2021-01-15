@@ -7,12 +7,13 @@ import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.get.GetRequest;
 import org.elasticsearch.action.get.GetResponse;
+import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
-import org.elasticsearch.common.document.DocumentField;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
@@ -20,12 +21,11 @@ import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -34,25 +34,21 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class SearchServiceImpl implements ISearchService {
 
-    private RestHighLevelClient client;
+    @Autowired
+    private RestHighLevelClient restHighLevelClient;
 
-    public SearchServiceImpl() {
-        RestHighLevelClient client = new RestHighLevelClient(
-            RestClient.builder(
-                new HttpHost("10.230.55.48", 9200, "http")
-            )
-        );
-        this.client = client;
-    }
+    @Override
+    public void index() throws IOException {
+        IndexRequest indexRequest = new IndexRequest("posts");
+        Map<String, Object> jsonMap = new HashMap<>();
+        jsonMap.put("user", "steven");
+        jsonMap.put("postDate", new Date());
+        jsonMap.put("message", "trying out Elasticsearch");
+        indexRequest.source(jsonMap);
+        indexRequest.id(UUID.randomUUID().toString());
+        IndexResponse indexResponse = restHighLevelClient.index(indexRequest, RequestOptions.DEFAULT);
 
-    public void shutdown() {
-        if (client != null) {
-            try {
-                client.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
+        System.out.println("indexResponse: " + indexResponse);
     }
 
     /**
@@ -62,19 +58,15 @@ public class SearchServiceImpl implements ISearchService {
      * @param id
      * @return
      */
-    public String getNameById(String index, String id) {
+    public Map<String, Object> getNameById(String index, String id) throws IOException {
         GetRequest getRequest = new GetRequest(index, id);
-        GetResponse getResponse = null;
-        try {
-            getResponse = this.client.get(getRequest, RequestOptions.DEFAULT);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
+        GetResponse getResponse = restHighLevelClient.get(getRequest, RequestOptions.DEFAULT);
         Map<String, Object> source = getResponse.getSource();
         System.out.println("查询结果: " + source);
-        return (String) source.get("FUNC_NAME");
+        return source;
     }
+
+
 
 
     public SearchHits search(String index, String key, String value) {
@@ -93,7 +85,7 @@ public class SearchServiceImpl implements ISearchService {
         List<Map<String, Object>> list = new ArrayList<>();
         SearchHits searchHits = null;
         try {
-            searchResponse = this.client.search(searchRequest, RequestOptions.DEFAULT);
+            searchResponse = this.restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
             searchHits = searchResponse.getHits();
             for (SearchHit hit : searchHits.getHits()) {
                 System.out.println(hit.getSourceAsString());
@@ -127,7 +119,7 @@ public class SearchServiceImpl implements ISearchService {
         for (SearchHit hit : searchHits.getHits()) {
             deleteRequest = new DeleteRequest("article-2019.08.08.03", hit.getId());
             try {
-                DeleteResponse deleteResponse = this.client.delete(deleteRequest, RequestOptions.DEFAULT);
+                DeleteResponse deleteResponse = this.restHighLevelClient.delete(deleteRequest, RequestOptions.DEFAULT);
                 System.out.println("Delete Done【" + deleteResponse.getId() + "】,Status:【" + deleteResponse.status() + "】");
             } catch (IOException e) {
                 e.printStackTrace();
@@ -147,7 +139,7 @@ public class SearchServiceImpl implements ISearchService {
 
 
             //异步删除
-            this.client.deleteAsync(deleteRequest, RequestOptions.DEFAULT, new ActionListener<DeleteResponse>() {
+            this.restHighLevelClient.deleteAsync(deleteRequest, RequestOptions.DEFAULT, new ActionListener<DeleteResponse>() {
                 @Override
                 public void onResponse(DeleteResponse deleteResponse) {
                     RestStatus restStatus = deleteResponse.status();
