@@ -7,5 +7,15 @@ import java.io.IOException;
  * @date 2021-01-15
  */
 public interface ISearchService {
-    void index() throws IOException;
+
+    /**
+     * 创建模拟数据
+     *
+     * @throws Exception
+     */
+    void createDemoData() throws Exception;
+
+    void createDemoDataBulk() throws Exception;
+
+    void deleteRecord(String indexName) throws IOException;
 }

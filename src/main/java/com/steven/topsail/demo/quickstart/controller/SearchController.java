@@ -1,15 +1,12 @@
 package com.steven.topsail.demo.quickstart.controller;
 
 import com.steven.topsail.demo.quickstart.service.impl.SearchServiceImpl;
-import org.elasticsearch.action.index.IndexRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -22,9 +19,19 @@ public class SearchController {
     @Autowired
     private SearchServiceImpl searchServiceImpl;
 
+    @GetMapping("createDemoData")
+    public void createDemoData() throws Exception {
+        searchServiceImpl.createDemoData();
+    }
 
-    public void index() throws IOException {
-        searchServiceImpl.index();
+    @GetMapping("createDemoDataBulk")
+    public void createDemoDataBulk() throws Exception {
+        searchServiceImpl.createDemoDataBulk();
+    }
+
+    @GetMapping("truncate/{indexName}")
+    public void truncateIndex(@PathVariable("indexName") String indexName) throws IOException {
+        searchServiceImpl.deleteRecord(indexName);
     }
 
     /**

@@ -1,8 +1,10 @@
 package com.steven.topsail.demo.quickstart.service.impl;
 
 import com.steven.topsail.demo.quickstart.service.ISearchService;
-import org.apache.http.HttpHost;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.elasticsearch.action.ActionListener;
+import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.get.GetRequest;
@@ -12,11 +14,12 @@ import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.RequestOptions;
-import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.RangeQueryBuilder;
+import org.elasticsearch.index.reindex.DeleteByQueryRequest;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
@@ -31,24 +34,79 @@ import java.util.concurrent.TimeUnit;
 /**
  * @author Steven
  */
+@Slf4j
 @Service
 public class SearchServiceImpl implements ISearchService {
+
+    private static final int DEMO_NUMBER = 100;
 
     @Autowired
     private RestHighLevelClient restHighLevelClient;
 
+    /**
+     * 生成模拟数据
+     *
+     * @throws Exception
+     */
     @Override
-    public void index() throws IOException {
-        IndexRequest indexRequest = new IndexRequest("posts");
-        Map<String, Object> jsonMap = new HashMap<>();
-        jsonMap.put("user", "steven");
-        jsonMap.put("postDate", new Date());
-        jsonMap.put("message", "trying out Elasticsearch");
-        indexRequest.source(jsonMap);
-        indexRequest.id(UUID.randomUUID().toString());
-        IndexResponse indexResponse = restHighLevelClient.index(indexRequest, RequestOptions.DEFAULT);
+    public void createDemoData() throws Exception {
+        long start = System.currentTimeMillis();
+        for (int i = 0; i < DEMO_NUMBER; i++) {
+            IndexRequest indexRequest = new IndexRequest("posts");
+            Map<String, Object> jsonMap = new HashMap<>(6);
+            jsonMap.put("user", RandomStringUtils.randomAlphabetic(8));
+            jsonMap.put("date", new Date());
+            jsonMap.put("message", RandomStringUtils.randomAlphabetic(16));
+            indexRequest.source(jsonMap);
+            indexRequest.id(UUID.randomUUID().toString());
+            IndexResponse indexResponse = restHighLevelClient.index(indexRequest, RequestOptions.DEFAULT);
+            Thread.sleep(10);
+        }
+        long cost = System.currentTimeMillis() - start;
+        log.info("创建 {} 条模拟数据，耗时：{} ms", DEMO_NUMBER, cost);
+    }
 
-        System.out.println("indexResponse: " + indexResponse);
+    /**
+     * 采用 Bulk API 生成模拟数据
+     *
+     * @throws Exception
+     */
+    @Override
+    public void createDemoDataBulk() throws Exception {
+
+        for (int i = 0; i < 10; i++) {
+            long start = System.currentTimeMillis();
+            BulkRequest bulkRequest = new BulkRequest();
+            for (int j = 0; j < 10000; j++) {
+                IndexRequest indexRequest = new IndexRequest("posts");
+                Map<String, Object> jsonMap = new HashMap<>(6);
+                jsonMap.put("user", RandomStringUtils.randomAlphabetic(8));
+                jsonMap.put("date", new Date());
+                jsonMap.put("message", RandomStringUtils.randomAlphabetic(16));
+                indexRequest.source(jsonMap);
+                indexRequest.id(UUID.randomUUID().toString());
+                bulkRequest.add(indexRequest);
+            }
+            restHighLevelClient.bulk(bulkRequest, RequestOptions.DEFAULT);
+            long cost = System.currentTimeMillis() - start;
+            log.info("批量创建 {} 条模拟数据，耗时：{} ms", 10000, cost);
+        }
+
+    }
+
+    /**
+     * 批量删除数据
+     *
+     * @param indexName
+     * @throws IOException
+     */
+    @Override
+    public void deleteRecord(String indexName) throws IOException {
+        DeleteByQueryRequest deleteByQueryRequest = new DeleteByQueryRequest(indexName);
+        deleteByQueryRequest.setConflicts("proceed");
+        RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery("date").lt(new Date());
+        deleteByQueryRequest.setQuery(rangeQueryBuilder);
+        restHighLevelClient.deleteByQuery(deleteByQueryRequest, RequestOptions.DEFAULT);
     }
 
     /**
@@ -65,9 +123,6 @@ public class SearchServiceImpl implements ISearchService {
         System.out.println("查询结果: " + source);
         return source;
     }
-
-
-
 
     public SearchHits search(String index, String key, String value) {
         QueryBuilder matchQueryBuilder = QueryBuilders.matchPhraseQuery(key, value);
