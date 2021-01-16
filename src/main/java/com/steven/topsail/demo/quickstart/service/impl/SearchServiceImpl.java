@@ -15,7 +15,9 @@ import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.common.unit.Fuzziness;
 import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.index.query.MatchQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
@@ -24,6 +26,8 @@ import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
+import org.elasticsearch.search.fetch.subphase.highlight.HighlightField;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -112,16 +116,69 @@ public class SearchServiceImpl implements ISearchService {
     /**
      * 获取指定index和id的 数据
      *
-     * @param index
+     * @param indexName
      * @param id
      * @return
      */
-    public Map<String, Object> getNameById(String index, String id) throws IOException {
-        GetRequest getRequest = new GetRequest(index, id);
+    public Map<String, Object> getNameById(String indexName, String id) throws IOException {
+        GetRequest getRequest = new GetRequest(indexName, id);
         GetResponse getResponse = restHighLevelClient.get(getRequest, RequestOptions.DEFAULT);
         Map<String, Object> source = getResponse.getSource();
         System.out.println("查询结果: " + source);
         return source;
+    }
+
+    /**
+     * matchAllQuery 查询所有数据：searchSourceBuilder.query(QueryBuilders.matchAllQuery());
+     * termQuery     作为一个整体和目标字段进行匹配：searchSourceBuilder.query(QueryBuilders.termQuery("PARENT_FUNC_ID", "mrs0000"));
+     * matchQuery    将搜索词分词，再与目标字段进行匹配，若分词中的任意一个词，与目标字段匹配上，则可查询到: searchSourceBuilder.query(QueryBuilders.matchQuery("FUNC_NAME", "提醒类"));
+     *
+     * @throws IOException
+     */
+    @Override
+    public void search() throws IOException {
+
+        HighlightBuilder highlightBuilder = new HighlightBuilder();
+        HighlightBuilder.Field highlightField = new HighlightBuilder.Field("FUNC_NAME");
+        highlightBuilder.field(highlightField);
+        highlightBuilder.preTags("<span style='color:red'>");
+        highlightBuilder.postTags("</span>");
+
+        SearchRequest searchRequest = new SearchRequest("sec_function");
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        QueryBuilder queryBuilder = QueryBuilders
+            .matchQuery("FUNC_NAME", "提醒类")
+            .fuzziness(Fuzziness.AUTO)
+            .prefixLength(3)
+            .maxExpansions(10);
+        searchSourceBuilder.query(queryBuilder);
+        searchSourceBuilder.from(0);
+        searchSourceBuilder.size(5);
+        searchSourceBuilder.fetchSource(
+            new String[]{"MODULE_TYPE", "FUNC_NAME", "FUN_SEQ", "FUNC_ID", "FUNC_LEVEL", "PARENT_FUNC_ID"},
+            new String[]{"@timestamp", "@version"}
+        );
+        searchSourceBuilder.highlighter(highlightBuilder);
+        searchSourceBuilder.timeout(new TimeValue(5, TimeUnit.SECONDS));
+        searchRequest.source(searchSourceBuilder);
+        SearchResponse searchResponse = restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
+        SearchHits searchHits = searchResponse.getHits();
+
+        log.info("HTTP状态码: {}，查询时间: {} ms，是否超时: {}，查询命中数量: {}，最大分值: {}",
+            searchResponse.status().getStatus(),
+            searchResponse.getTook().getMillis(),
+            searchResponse.isTimedOut(),
+            searchHits.getTotalHits().value,
+            searchHits.getMaxScore()
+        );
+
+        for (SearchHit searchHit : searchHits.getHits()) {
+            Map<String, HighlightField> highlightFields = searchHit.getHighlightFields();
+            HighlightField funcName = highlightFields.get("FUNC_NAME");
+            Map<String, Object> source = searchHit.getSourceAsMap();
+            log.info("{}", funcName.getFragments());
+            log.info("{}", source);
+        }
     }
 
     public SearchHits search(String index, String key, String value) {

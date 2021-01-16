@@ -47,10 +47,9 @@ public class SearchController {
     }
 
     @GetMapping("/search")
-    public String search(String content) {
-        String article = "";
-        //article = esRestService.searchArticle(content);
-        return article;
+    public String search(String content) throws IOException {
+        searchServiceImpl.search();
+        return "ok";
     }
 
     @GetMapping("/delete")

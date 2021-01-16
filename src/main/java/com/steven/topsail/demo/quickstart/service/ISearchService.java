@@ -18,4 +18,6 @@ public interface ISearchService {
     void createDemoDataBulk() throws Exception;
 
     void deleteRecord(String indexName) throws IOException;
+
+    void search() throws IOException;
 }
