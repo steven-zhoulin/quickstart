@@ -147,7 +147,7 @@ public class SearchServiceImpl implements ISearchService {
         SearchRequest searchRequest = new SearchRequest("sec_function");
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         QueryBuilder queryBuilder = QueryBuilders
-            .matchQuery("FUNC_NAME", "提醒类")
+            .matchQuery("FUNC_NAME", "备卡激活")
             .fuzziness(Fuzziness.AUTO)
             .prefixLength(3)
             .maxExpansions(10);
