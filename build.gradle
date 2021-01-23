@@ -18,9 +18,9 @@ dependencies {
     implementation "commons-io:commons-io:2.6"
     implementation "org.apache.commons:commons-lang3:3.9"
     implementation "org.projectlombok:lombok:1.16.10"
-    implementation "org.elasticsearch:elasticsearch:7.10.1"
-    implementation "org.elasticsearch.client:elasticsearch-rest-client:7.10.1"
-    implementation "org.elasticsearch.client:elasticsearch-rest-high-level-client:7.10.1"
+    implementation "org.elasticsearch:elasticsearch:7.10.2"
+    implementation "org.elasticsearch.client:elasticsearch-rest-client:7.10.2"
+    implementation "org.elasticsearch.client:elasticsearch-rest-high-level-client:7.10.2"
     implementation "com.google.guava:guava:20.0"
 
     // 编译期有效，不参与打包
