@@ -46,7 +46,7 @@ public class RestHighLevelClientConfig {
                 requestConfigBuilder.setConnectionRequestTimeout(-1);
                 return requestConfigBuilder;
             }).setHttpClientConfigCallback(httpClientBuilder -> {
-                final CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+                CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
                 credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(username, password));
                 httpClientBuilder.disableAuthCaching();
                 return httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
