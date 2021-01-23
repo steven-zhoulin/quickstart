@@ -8,12 +8,24 @@ import java.io.IOException;
  */
 public interface ISearchService {
 
+    void indexRequest() throws IOException;
+
+    void getApi() throws IOException;
+
+    void isExist() throws IOException;
+
+    void delete() throws IOException;
+
+    void update() throws IOException;
+
     /**
      * 创建模拟数据
      *
      * @throws Exception
      */
     void createDemoData() throws Exception;
+
+    void multiGet() throws IOException;
 
     void createDemoDataBulk() throws Exception;
 

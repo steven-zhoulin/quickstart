@@ -9,6 +9,7 @@ import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.CreateIndexResponse;
 import org.elasticsearch.client.indices.GetIndexRequest;
+import org.elasticsearch.common.xcontent.XContentType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -29,14 +30,61 @@ public class IndexServiceImpl implements IIndexService {
      * 创建索引
      *
      * @param indexName 索引名
-     * @param request
      * @throws IOException
      */
     @Override
-    public void createIndex(String indexName, CreateIndexRequest request) throws IOException {
+    public void createIndex(String indexName) throws IOException {
+
         if (!existsIndex(indexName)) {
             log.info("创建索引: {}", indexName);
-            CreateIndexResponse response = restHighLevelClient.indices().create(request, RequestOptions.DEFAULT);
+            CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName);
+            createIndexRequest.source("{\n" +
+                    "  \"settings\": {\n" +
+                    "    \"number_of_shards\": \"5\",\n" +
+                    "    \"number_of_replicas\": \"0\"\n" +
+                    "  },\n" +
+                    "  \"mappings\": {\n" +
+                    "    \"properties\": {\n" +
+                    "      \"DONE_DATE\": {\n" +
+                    "        \"type\": \"date\"\n" +
+                    "      },\n" +
+                    "      \"FUNC_ID\": {\n" +
+                    "        \"type\": \"text\"\n" +
+                    "      },\n" +
+                    "      \"FUNC_IMG\": {\n" +
+                    "        \"type\": \"text\"\n" +
+                    "      },\n" +
+                    "      \"FUNC_LEVEL\": {\n" +
+                    "        \"type\": \"long\"\n" +
+                    "      },\n" +
+                    "      \"FUNC_NAME\": {\n" +
+                    "        \"type\": \"text\",\n" +
+                    "        \"analyzer\": \"ik_max_word\",\n" +
+                    "        \"search_analyzer\": \"ik_max_word\"\n" +
+                    "      },\n" +
+                    "      \"FUN_SEQ\": {\n" +
+                    "        \"type\": \"long\"\n" +
+                    "      },\n" +
+                    "      \"MODULE_TYPE\": {\n" +
+                    "        \"type\": \"text\"\n" +
+                    "      },\n" +
+                    "      \"PARENT_FUNC_ID\": {\n" +
+                    "        \"type\": \"text\"\n" +
+                    "      },\n" +
+                    "      \"STATE\": {\n" +
+                    "        \"type\": \"text\"\n" +
+                    "      },\n" +
+                    "      \"VIEWNAME\": {\n" +
+                    "        \"type\": \"text\",\n" +
+                    "        \"analyzer\": \"ik_max_word\",\n" +
+                    "        \"search_analyzer\": \"ik_max_word\"\n" +
+                    "      }\n" +
+                    "    }\n" +
+                    "  }\n" +
+                    "}",
+                XContentType.JSON);
+
+            CreateIndexResponse response = restHighLevelClient.indices().create(createIndexRequest, RequestOptions.DEFAULT);
             System.out.println(response.toString());
             log.info("索引创建结果: {}", response.isAcknowledged());
         } else {

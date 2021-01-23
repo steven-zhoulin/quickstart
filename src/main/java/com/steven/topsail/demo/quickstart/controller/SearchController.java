@@ -19,6 +19,36 @@ public class SearchController {
     @Autowired
     private SearchServiceImpl searchServiceImpl;
 
+    @GetMapping("indexRequest")
+    public void indexRequest() throws IOException {
+        searchServiceImpl.indexRequest();
+    }
+
+    @GetMapping("getApi")
+    public void getApi() throws IOException {
+        searchServiceImpl.getApi();
+    }
+
+    @GetMapping("isExist")
+    public void isExist() throws IOException {
+        searchServiceImpl.isExist();
+    }
+
+    @GetMapping("deleteById")
+    public void delete() throws IOException {
+        searchServiceImpl.delete();
+    }
+
+    @GetMapping("update")
+    public void update() throws IOException {
+        searchServiceImpl.update();
+    }
+
+    @GetMapping("multiGet")
+    public void multiGet() throws IOException {
+        searchServiceImpl.multiGet();
+    }
+
     @GetMapping("createDemoData")
     public void createDemoData() throws Exception {
         searchServiceImpl.createDemoData();

@@ -4,20 +4,27 @@ import com.steven.topsail.demo.quickstart.service.ISearchService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.elasticsearch.action.ActionListener;
+import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.action.bulk.BulkRequest;
+import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.delete.DeleteResponse;
-import org.elasticsearch.action.get.GetRequest;
-import org.elasticsearch.action.get.GetResponse;
+import org.elasticsearch.action.get.*;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.action.support.ActiveShardCount;
+import org.elasticsearch.action.support.WriteRequest;
+import org.elasticsearch.action.update.UpdateRequest;
+import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.common.unit.Fuzziness;
 import org.elasticsearch.common.unit.TimeValue;
-import org.elasticsearch.index.query.MatchQueryBuilder;
+import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.common.xcontent.XContentFactory;
+import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
@@ -26,6 +33,7 @@ import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.fetch.subphase.FetchSourceContext;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightField;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +54,109 @@ public class SearchServiceImpl implements ISearchService {
 
     @Autowired
     private RestHighLevelClient restHighLevelClient;
+
+    @Override
+    public void indexRequest() throws IOException {
+        /** 从 json 字符串索引数据 */
+        IndexRequest indexRequest1 = new IndexRequest("posts");
+        String jsonString = "{" +
+            "\"user\" : \"张三\"," +
+            "\"date\" : \"2013-01-30\"," +
+            "\"message\" : \"打酱油\"" +
+            "}";
+        indexRequest1.source(jsonString, XContentType.JSON);
+        indexRequest1.id("10000");
+        IndexResponse indexResponse1 = restHighLevelClient.index(indexRequest1, RequestOptions.DEFAULT);
+        displayIndexResponse(indexResponse1);
+
+        /** 从 map 对象索引数据 */
+        IndexRequest indexRequest2 = new IndexRequest("posts");
+        Map<String, Object> jsonMap = new HashMap<>();
+        jsonMap.put("user", "李四");
+        jsonMap.put("date", "2014-01-01");
+        jsonMap.put("message", "王婆卖瓜越卖越夸");
+        indexRequest2.source(jsonMap);
+        indexRequest2.id("10001");
+        IndexResponse indexResponse2 = restHighLevelClient.index(indexRequest2, RequestOptions.DEFAULT);
+        displayIndexResponse(indexResponse2);
+
+        /** 使用 XContentBuilder 创建对象索引数据 */
+        IndexRequest indexRequest3 = new IndexRequest("posts");
+        XContentBuilder xContentBuilder = XContentFactory.jsonBuilder();
+        xContentBuilder.startObject();
+        xContentBuilder.field("user", "王五");
+        xContentBuilder.timeField("date", new Date());
+        xContentBuilder.field("message", "卖烧饼");
+        xContentBuilder.endObject();
+        indexRequest3.source(xContentBuilder);
+        indexRequest3.id("10002");
+        IndexResponse indexResponse3 = restHighLevelClient.index(indexRequest3, RequestOptions.DEFAULT);
+        displayIndexResponse(indexResponse3);
+
+    }
+
+    private void displayIndexResponse(IndexResponse indexResponse) {
+        String index = indexResponse.getIndex();
+        String id = indexResponse.getId();
+        long version = indexResponse.getVersion();
+        log.info("index: {}, id: {}, version: {}", index, id, version);
+        if (DocWriteResponse.Result.CREATED == indexResponse.getResult()) {
+            log.info("文档第一次创建");
+        } else if (DocWriteResponse.Result.UPDATED == indexResponse.getResult()) {
+            log.info("文档之前已存在,这次是更新");
+        }
+    }
+
+    @Override
+    public void getApi() throws IOException {
+        GetRequest getRequest = new GetRequest("posts", "10000");
+        String[] includes = new String[] {"user", "date"};
+        String[] excludes = new String[] {"message"};
+        FetchSourceContext fetchSourceContext = new FetchSourceContext(true, includes, excludes);
+        getRequest.fetchSourceContext(fetchSourceContext);
+        GetResponse getResponse = restHighLevelClient.get(getRequest, RequestOptions.DEFAULT);
+        String index = getResponse.getIndex();
+        String type = getResponse.getType();
+        String id = getResponse.getId();
+        if (getResponse.isExists()) {
+            long version = getResponse.getVersion();
+            String sourceAsString = getResponse.getSourceAsString();
+            Map<String, Object> sourceAsMap = getResponse.getSourceAsMap();
+            byte[] sourceAsBytes = getResponse.getSourceAsBytes();
+            log.info("version: {}, sourceAsString: {}", version, sourceAsString);
+        } else {
+            // 没有发现请求的文档
+        }
+    }
+
+    @Override
+    public void isExist() throws IOException {
+        GetRequest getRequest = new GetRequest("posts", "10001");
+        getRequest.fetchSourceContext(FetchSourceContext.DO_NOT_FETCH_SOURCE);
+
+        boolean exists = restHighLevelClient.exists(getRequest, RequestOptions.DEFAULT);
+        log.info("isExist: {}", exists);
+    }
+
+    @Override
+    public void delete() throws IOException {
+        DeleteRequest deleteRequest = new DeleteRequest("posts","10002");
+        deleteRequest.timeout(TimeValue.timeValueSeconds(2));
+        deleteRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL);
+        DeleteResponse deleteResponse = restHighLevelClient.delete(deleteRequest, RequestOptions.DEFAULT);
+        log.info("deleteResponse: {}", deleteResponse.getResult());
+    }
+
+    @Override
+    public void update() throws IOException {
+        UpdateRequest updateRequest = new UpdateRequest("posts", "10001");
+        Map<String, Object> map = new HashMap<>(6);
+        map.put("date", new Date());
+        map.put("sec", "female");
+        updateRequest.doc(map);
+        UpdateResponse updateResponse = restHighLevelClient.update(updateRequest, RequestOptions.DEFAULT);
+        log.info("updateResponse: {}", updateResponse.getResult());
+    }
 
     /**
      * 生成模拟数据
@@ -70,6 +181,18 @@ public class SearchServiceImpl implements ISearchService {
         log.info("创建 {} 条模拟数据，耗时：{} ms", DEMO_NUMBER, cost);
     }
 
+    @Override
+    public void multiGet() throws IOException {
+        MultiGetRequest multiGetRequest = new MultiGetRequest();
+        multiGetRequest.add(new MultiGetRequest.Item("posts", "10000"));
+        multiGetRequest.add(new MultiGetRequest.Item("posts", "10001"));
+        MultiGetResponse mget = restHighLevelClient.mget(multiGetRequest, RequestOptions.DEFAULT);
+        for (MultiGetItemResponse response : mget.getResponses()) {
+            Map<String, Object> source = response.getResponse().getSource();
+            System.out.println(source);
+        }
+    }
+
     /**
      * 采用 Bulk API 生成模拟数据
      *
@@ -91,7 +214,10 @@ public class SearchServiceImpl implements ISearchService {
                 indexRequest.id(UUID.randomUUID().toString());
                 bulkRequest.add(indexRequest);
             }
-            restHighLevelClient.bulk(bulkRequest, RequestOptions.DEFAULT);
+
+            /** 在批量操作前要求全部分片都处于激活状态 */
+            bulkRequest.waitForActiveShards(ActiveShardCount.ALL);
+            BulkResponse bulk = restHighLevelClient.bulk(bulkRequest, RequestOptions.DEFAULT);
             long cost = System.currentTimeMillis() - start;
             log.info("批量创建 {} 条模拟数据，耗时：{} ms", 10000, cost);
         }
@@ -176,7 +302,7 @@ public class SearchServiceImpl implements ISearchService {
             Map<String, HighlightField> highlightFields = searchHit.getHighlightFields();
             HighlightField funcName = highlightFields.get("FUNC_NAME");
             Map<String, Object> source = searchHit.getSourceAsMap();
-            log.info("{}", funcName.getFragments());
+            //log.info("{}", funcName.getFragments());
             log.info("{}", source);
         }
     }

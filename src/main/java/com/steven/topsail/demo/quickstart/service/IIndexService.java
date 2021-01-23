@@ -13,10 +13,9 @@ public interface IIndexService {
      * 创建索引
      *
      * @param index
-     * @param request
      * @throws IOException
      */
-    void createIndex(String index, CreateIndexRequest request) throws IOException;
+    void createIndex(String index) throws IOException;
 
     /**
      * 判断索引是否存在
